@@ -6,7 +6,7 @@ import getWeb3 from "./getWeb3";
 import "./App.css";
 
 class App extends Component {
-  state = { loaded: false}
+  state = { cost: 0, itemName: "exampleItem1", loaded: false}
 
   componentDidMount = async () => {
     try {
@@ -17,7 +17,7 @@ class App extends Component {
       this.accounts = await this.web3.eth.getAccounts();
 
       // Get the contract instance.
-      this.networkId = await this.web3.eth.net.getId();
+      const networkId = await this.web3.eth.net.getId();
       this.itemManagerContract = new this.web3.eth.Contract(
         ItemManagerContract.abi,
         ItemManagerContract.networks[networkId] && ItemManagerContract.networks[networkId].address
@@ -40,23 +40,12 @@ class App extends Component {
     }
   };
 
-  runExample = async () => {
-
-    // Stores a given value, 5 by default.
-    await contract.methods.set(5).send({ from: accounts[0] });
-
-    // Get the value from the contract to prove it worked.
-    const response = await contract.methods.get().call();
-
-    // Update state with the result.
-    this.setState({ storageValue: response });
-  };
 
   // handle when a user updates anything in an input box to the state
   handleInputChange = (event) => {
     const target = event.target;
     // if the target is a checkbox then use the checked value, otherwise the value value
-    const value = target.value == "checkbox" ? target.checked : target.value;
+    const value = target.value === "checkbox" ? target.checked : target.value;
     const name = target.name;
     this.setState({
       [name]: value,
@@ -67,7 +56,25 @@ class App extends Component {
     const {cost, itemName} = this.state;
     console.log(itemName, cost, this.itemManager);
     // send the transaction from the first loaded accounts !!
-    await this.itemManager.methods.createItem(itemName, cost).send({from: this.accounts[0]});
+    let result = await this.itemManagerContract.methods.createItem(itemName, cost).send({from: this.accounts[0]});
+
+    console.log(result);
+    alert("Send " + cost+ "Wei to " + result.events.SupplyChainStep.returnValues._item);
+  }
+
+  //0xCc3203B806f83381D5d7daFB179AfC2f99fA7741
+  // super important method that listens to any events that get emitted by the smart contract!! 
+  // 
+  listenToEventPayment = () => {
+    // way of passing this into a callback function
+    let self = this;
+
+    this.itemManager.events.SupplyChainStep().on("data", async function(evt) {
+      console.log(evt);
+      // Read the value from the blockchain!!
+      let itemObj = await self.itemManager.methods.items(evt.returnValues._itemIndex).call();
+      alert("Item" + itemObj._identifier+ "was paid: Deliver it now!");
+    })
   }
 
   render() {
